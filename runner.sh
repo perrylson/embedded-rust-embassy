@@ -1,4 +1,1 @@
-#!/bin/sh
-sudo mkdir -p /mnt/pico
-sudo mount -t drvfs d: /mnt/pico
-elf2uf2-rs -d -s $1
+probe-rs run --chip RP235x
