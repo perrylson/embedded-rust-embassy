@@ -35,5 +35,48 @@ pub mod sensor {
             };
             dps310_sensor
         }
+
+        async fn check_temperature_status(&mut self) -> Result<&'static str, &'static str> {
+            let mut meas_data: [u8; 1] = [0];
+            let mut count = 0;
+            let mut is_ready = false;
+
+            while !is_ready && count < 5 {
+                self.i2c
+                    .write_read_async(SENSOR_ADDR, [MEAS_CFG_ADDR], &mut meas_data)
+                    .await
+                    .unwrap();
+
+                if meas_data[0] & (1 << 5) != 0 {
+                    info!("Temperature is ready to be read");
+                    is_ready = true;
+                } else {
+                    info!("Temperature is not ready to be read");
+                    Timer::after(Duration::from_millis(100)).await;
+                }
+
+                count += 1;
+            }
+
+            if is_ready {
+                Ok("Successfully read temperature")
+            } else {
+                Err("Could not read temperature")
+            }
+        }
+
+        pub async fn read_product_id(&mut self) -> Result<&'static str, &'static str> {
+            let mut result = [0];
+            self.i2c
+                .write_read_async(SENSOR_ADDR, [PROD_ID_REG_ADDR], &mut result)
+                .await
+                .unwrap();
+            if result[0] == 16 {
+                Ok("Was able to read product id")
+            } else {
+                Err("Could not find product id")
+            }
+        }
     }
+    
 }
