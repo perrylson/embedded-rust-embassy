@@ -63,10 +63,16 @@ pub mod sensor {
                 c20: 0,
                 c21: 0,
                 c30: 0,
-                selected_temperature_scale_factor: SCALE_FACTORS[2],
-                selected_pressure_scale_factor: SCALE_FACTORS[2],
+                selected_temperature_scale_factor: 0,
+                selected_pressure_scale_factor: 0,
             };
             dps310_sensor.initialize_sensor().await;
+            dps310_sensor
+                .set_temperature_oversampling_rate(OversampleRate::Four)
+                .await;
+            dps310_sensor
+                .set_pressure_oversampling_rate(OversampleRate::Four)
+                .await;
             dps310_sensor
         }
 
