@@ -27,7 +27,7 @@ bind_interrupts!(struct Irqs {
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) -> ! {
-    let _periphs = embassy_rp::init(Default::default());
+    let p = embassy_rp::init(Default::default());
     let fw = include_bytes!("../cyw43/43439A0.bin");
     let clm = include_bytes!("../cyw43/43439A0_clm.bin");
 
