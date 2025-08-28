@@ -213,42 +213,36 @@ pub mod sensor {
         }
 
         pub async fn initialize_coeffs(&mut self) {
-            let mut result: [u8; 18] = [0; 18];
+            let mut coeffs_raw: [u8; 18] = [0; 18];
 
             self.i2c
-                .write_read_async(SENSOR_ADDR, [COEFFS_ADDR], &mut result)
+                .write_read_async(SENSOR_ADDR, [COEFFS_ADDR], &mut coeffs_raw)
                 .await
                 .unwrap();
 
-            self.c0 = get_twos_complement(
-                ((result[0] as u32) << 4) + (((result[1] as u32) >> 4) & 0x0F),
-                12,
-            );
+            let result: [u32; 18] = coeffs_raw.map(|x| x as u32);
 
-            self.c1 =
-                get_twos_complement((((result[1] as u32) & 0x0F) << 8) + (result[2] as u32), 12);
+            self.c0 = get_twos_complement(((result[0]) << 4) + (((result[1]) >> 4) & 0x0F), 12);
+
+            self.c1 = get_twos_complement((((result[1]) & 0x0F) << 8) + (result[2]), 12);
 
             self.c00 = get_twos_complement(
-                ((result[3] as u32) << 12)
-                    + ((result[4] as u32) << 4)
-                    + (((result[5] as u32) >> 4) & 0x0F),
+                ((result[3]) << 12) + ((result[4]) << 4) + (((result[5]) >> 4) & 0x0F),
                 20,
             );
 
-            self.c10 = get_twos_complement(
-                ((result[5] as u32) << 16) + ((result[6] as u32) << 8) + (result[7] as u32),
-                20,
-            );
+            self.c10 =
+                get_twos_complement(((result[5]) << 16) + ((result[6]) << 8) + (result[7]), 20);
 
-            self.c01 = get_twos_complement(((result[8] as u32) << 8) + (result[9] as u32), 16);
+            self.c01 = get_twos_complement(((result[8]) << 8) + (result[9]), 16);
 
-            self.c11 = get_twos_complement(((result[10] as u32) << 8) + (result[11] as u32), 16);
+            self.c11 = get_twos_complement(((result[10]) << 8) + (result[11]), 16);
 
-            self.c20 = get_twos_complement(((result[12] as u32) << 8) + (result[13] as u32), 16);
+            self.c20 = get_twos_complement(((result[12]) << 8) + (result[13]), 16);
 
-            self.c21 = get_twos_complement(((result[14] as u32) << 8) + (result[15] as u32), 16);
+            self.c21 = get_twos_complement(((result[14]) << 8) + (result[15]), 16);
 
-            self.c30 = get_twos_complement(((result[16] as u32) << 8) + (result[17] as u32), 16);
+            self.c30 = get_twos_complement(((result[16]) << 8) + (result[17]), 16);
         }
     }
     
