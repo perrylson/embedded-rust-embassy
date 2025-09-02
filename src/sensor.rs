@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 pub mod sensor {
-    use defmt::info;
+    use defmt::*;
     use embassy_rp::{i2c::Async, peripherals::I2C1};
     use embassy_time::{Duration, Timer};
     const SENSOR_ADDR: u8 = 0x77;
@@ -49,6 +49,8 @@ pub mod sensor {
         c30: i32,
         selected_temperature_scale_factor: i32,
         selected_pressure_scale_factor: i32,
+        is_temp_bit_shift_enabled: bool,
+        is_pressure_bit_shift_enabled: bool,
     }
     impl<'a> DPS310<'a> {
         pub async fn new(i2c: &'a mut embassy_rp::i2c::I2c<'a, I2C1, Async>) -> DPS310<'a> {
@@ -65,6 +67,8 @@ pub mod sensor {
                 c30: 0,
                 selected_temperature_scale_factor: 0,
                 selected_pressure_scale_factor: 0,
+                is_temp_bit_shift_enabled: false,
+                is_pressure_bit_shift_enabled: false,
             };
             dps310_sensor.initialize_sensor().await;
             dps310_sensor
@@ -75,10 +79,23 @@ pub mod sensor {
                 .await;
             dps310_sensor
         }
-
         pub async fn reset_sensor(&mut self) {
             self.i2c
                 .write_async(SENSOR_ADDR, [0x0C as u8, 0x9 as u8])
+                .await
+                .unwrap();
+        }
+
+        async fn update_config(&mut self) {
+            self.i2c
+                .write_async(
+                    SENSOR_ADDR,
+                    [
+                        CFG_REG_ADDR,
+                        0 + (u8::from(self.is_temp_bit_shift_enabled) << 3)
+                            + (u8::from(self.is_pressure_bit_shift_enabled) << 2),
+                    ],
+                )
                 .await
                 .unwrap();
         }
@@ -89,16 +106,21 @@ pub mod sensor {
                 OversampleRate::Two => (0x81, SCALE_FACTORS[1]),
                 OversampleRate::Four => (0x82, SCALE_FACTORS[2]),
                 OversampleRate::Eight => (0x83, SCALE_FACTORS[3]),
-                OversampleRate::Sixteen => todo!(),
-                OversampleRate::ThirtyTwo => todo!(),
-                OversampleRate::SixtyFour => todo!(),
-                OversampleRate::OneHundredTwentyEight => todo!(),
+                OversampleRate::Sixteen => (0x84, SCALE_FACTORS[4]),
+                OversampleRate::ThirtyTwo => (0x85, SCALE_FACTORS[5]),
+                OversampleRate::SixtyFour => (0x86, SCALE_FACTORS[6]),
+                OversampleRate::OneHundredTwentyEight => (0x87, SCALE_FACTORS[7]),
             };
             self.i2c
                 .write_async(SENSOR_ADDR, [TEMP_CONFIG_ADDR, reg_value])
                 .await
                 .unwrap();
             self.selected_temperature_scale_factor = scale_factor;
+
+            if reg_value > 0x83 {
+                self.is_temp_bit_shift_enabled = true;
+                self.update_config().await;
+            }
         }
 
         pub async fn set_pressure_oversampling_rate(&mut self, rate: OversampleRate) {
@@ -107,20 +129,25 @@ pub mod sensor {
                 OversampleRate::Two => (0x01, SCALE_FACTORS[1]),
                 OversampleRate::Four => (0x02, SCALE_FACTORS[2]),
                 OversampleRate::Eight => (0x03, SCALE_FACTORS[3]),
-                OversampleRate::Sixteen => todo!(),
-                OversampleRate::ThirtyTwo => todo!(),
-                OversampleRate::SixtyFour => todo!(),
-                OversampleRate::OneHundredTwentyEight => todo!(),
+                OversampleRate::Sixteen => (0x04, SCALE_FACTORS[4]),
+                OversampleRate::ThirtyTwo => (0x05, SCALE_FACTORS[5]),
+                OversampleRate::SixtyFour => (0x06, SCALE_FACTORS[6]),
+                OversampleRate::OneHundredTwentyEight => (0x07, SCALE_FACTORS[7]),
             };
             self.i2c
                 .write_async(SENSOR_ADDR, [PRESSURE_CONFIG_ADDR, reg_value])
                 .await
                 .unwrap();
             self.selected_pressure_scale_factor = scale_factor;
+
+            if reg_value > 0x03 {
+                self.is_pressure_bit_shift_enabled = true;
+                self.update_config().await;
+            }
         }
 
         pub async fn initialize_sensor(&mut self) {
-            let res = self.read_product_id().await;
+            self.read_product_id().await.unwrap();
 
             let mut temp_coef: [u8; 1] = [0];
             self.i2c
@@ -149,16 +176,42 @@ pub mod sensor {
             let mut count = 0;
             let mut is_ready = false;
             while !is_ready && count < 5 {
+                info!("Checking temperature read status...");
+
+                self.i2c
+                    .write_read_async(SENSOR_ADDR, [MEAS_CFG_ADDR], &mut meas_data)
+                    .await
+                    .unwrap();
+                if meas_data[0] & (1 << 5) != 0 {
+                    is_ready = true;
+                } else {
+                    Timer::after(Duration::from_millis(100)).await;
+                }
+                count += 1;
+            }
+
+            if is_ready {
+                Ok("Temperature is ready to be read")
+            } else {
+                Err("Temperature is not ready to be read")
+            }
+        }
+
+        async fn check_pressure_status(&mut self) -> Result<&'static str, &'static str> {
+            let mut meas_data: [u8; 1] = [0];
+            let mut count = 0;
+            let mut is_ready = false;
+            while !is_ready && count < 5 {
+                info!("Checking pressure read status...");
+
                 self.i2c
                     .write_read_async(SENSOR_ADDR, [MEAS_CFG_ADDR], &mut meas_data)
                     .await
                     .unwrap();
 
-                if meas_data[0] & (1 << 5) != 0 {
-                    info!("Temperature is ready to be read");
+                if meas_data[0] & (1 << 4) != 0 {
                     is_ready = true;
                 } else {
-                    info!("Temperature is not ready to be read");
                     Timer::after(Duration::from_millis(100)).await;
                 }
 
@@ -166,9 +219,9 @@ pub mod sensor {
             }
 
             if is_ready {
-                Ok("Successfully read temperature")
+                Ok("Pressure is ready to be read")
             } else {
-                Err("Could not read temperature")
+                Err("Pressure data is not ready to be read")
             }
         }
 
@@ -191,12 +244,68 @@ pub mod sensor {
                     + (temperature_data[2] as u32),
                 24,
             );
-            info!("raw_temp: {} ", raw_temp);
             let proc_temp = (self.c0 as f64) * 0.5
                 + (self.c1 as f64)
                     * ((raw_temp as f64) / (self.selected_temperature_scale_factor as f64));
             let temp_fahrenheit = (proc_temp * 9.0 / 5.0) + 32.0;
             info!("Celsius: {}  Fahrenheit: {}", proc_temp, temp_fahrenheit);
+        }
+
+        pub async fn read_pressure(&mut self) {
+            self.i2c
+                .write_async(SENSOR_ADDR, [MEAS_CFG_ADDR, 0x02 as u8])
+                .await
+                .unwrap();
+
+            self.check_temperature_status().await.unwrap();
+
+            let mut temperature_data: [u8; 3] = [0; 3];
+            self.i2c
+                .write_read_async(SENSOR_ADDR, [TEMP_ADDR], &mut temperature_data)
+                .await
+                .unwrap();
+            let raw_temp = get_twos_complement(
+                ((temperature_data[0] as u32) << 16)
+                    + ((temperature_data[1] as u32) << 8)
+                    + (temperature_data[2] as u32),
+                24,
+            );
+
+            let proc_raw_temp = (raw_temp as f64) / (self.selected_temperature_scale_factor as f64);
+
+            self.i2c
+                .write_async(SENSOR_ADDR, [MEAS_CFG_ADDR, 0x01 as u8])
+                .await
+                .unwrap();
+
+            self.check_pressure_status().await.unwrap();
+
+            let mut pressure_data: [u8; 3] = [0; 3];
+            self.i2c
+                .write_read_async(SENSOR_ADDR, [PRESSURE_ADDR], &mut pressure_data)
+                .await
+                .unwrap();
+            let raw_pressure = get_twos_complement(
+                ((pressure_data[0] as u32) << 16)
+                    + ((pressure_data[1] as u32) << 8)
+                    + (pressure_data[2] as u32),
+                24,
+            );
+
+            let proc_raw_pressure =
+                raw_pressure as f64 / self.selected_pressure_scale_factor as f64;
+
+            let proc_pressure = self.c00 as f64
+                + proc_raw_pressure
+                    * (self.c10 as f64
+                        + proc_raw_pressure
+                            * (self.c20 as f64 + proc_raw_pressure * self.c30 as f64))
+                + proc_raw_temp * self.c01 as f64
+                + proc_raw_temp
+                    * proc_raw_pressure
+                    * (self.c11 as f64 + proc_raw_pressure * self.c21 as f64);
+
+            info!("Pressure (Pa): {}", proc_pressure);
         }
 
         pub async fn read_product_id(&mut self) -> Result<&'static str, &'static str> {
@@ -224,15 +333,17 @@ pub mod sensor {
 
             self.c0 = get_twos_complement(((result[0]) << 4) + (((result[1]) >> 4) & 0x0F), 12);
 
-            self.c1 = get_twos_complement((((result[1]) & 0x0F) << 8) + (result[2]), 12);
+            self.c1 = get_twos_complement(((result[1] & 0x0F) << 8) + (result[2]), 12);
 
             self.c00 = get_twos_complement(
                 ((result[3]) << 12) + ((result[4]) << 4) + (((result[5]) >> 4) & 0x0F),
                 20,
             );
 
-            self.c10 =
-                get_twos_complement(((result[5]) << 16) + ((result[6]) << 8) + (result[7]), 20);
+            self.c10 = get_twos_complement(
+                ((result[5] & 0x0F) << 16) + ((result[6]) << 8) + (result[7]),
+                20,
+            );
 
             self.c01 = get_twos_complement(((result[8]) << 8) + (result[9]), 16);
 
@@ -245,5 +356,4 @@ pub mod sensor {
             self.c30 = get_twos_complement(((result[16]) << 8) + (result[17]), 16);
         }
     }
-    
 }
