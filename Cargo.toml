@@ -1,12 +1,12 @@
 [package]
 edition = "2024"
-name = "pico"
+name = "embedded-rust-dps310-i2c-driver"
 version = "0.1.0"
 authors = ["Perry Son <13183804+perrylson@users.noreply.github.com>"]
 resolver = "2"
 
 [[bin]]
-name = "pico"
+name = "embedded-rust-dps310-i2c-driver"
 test = false
 bench = false
 

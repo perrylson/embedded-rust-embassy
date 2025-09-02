@@ -1,5 +1,5 @@
-# embedded-rust-embassy
-Tested the DPS310 temperature and pressure sensor with the Raspberry Pi Pico 2 W. Used the Embassy library to set up a driver interface. Connected SDA and SCL to pin 14 and 15, respectively. 
+# embedded-rust-dps310-i2c-driver
+Tested the DPS310 temperature and pressure sensor with the Raspberry Pi Pico 2 W. Used the Embassy library to set up an I2C driver interface. Connected SDA and SCL to pin 14 and 15, respectively. Currently supports "command" mode.
 
 ### Get started
 - Run `cargo run` to see the sensor's temperature and pressure data

@@ -79,12 +79,6 @@ pub mod sensor {
                 .await;
             dps310_sensor
         }
-        pub async fn reset_sensor(&mut self) {
-            self.i2c
-                .write_async(SENSOR_ADDR, [0x0C as u8, 0x9 as u8])
-                .await
-                .unwrap();
-        }
 
         async fn update_config(&mut self) {
             self.i2c
@@ -146,7 +140,7 @@ pub mod sensor {
             }
         }
 
-        pub async fn initialize_sensor(&mut self) {
+        async fn initialize_sensor(&mut self) {
             self.read_product_id().await.unwrap();
 
             let mut temp_coef: [u8; 1] = [0];
@@ -321,7 +315,7 @@ pub mod sensor {
             }
         }
 
-        pub async fn initialize_coeffs(&mut self) {
+        async fn initialize_coeffs(&mut self) {
             let mut coeffs_raw: [u8; 18] = [0; 18];
 
             self.i2c
