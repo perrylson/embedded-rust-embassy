@@ -666,31 +666,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embedded-rust-dps310-i2c-driver"
-version = "0.1.0"
-dependencies = [
- "cortex-m",
- "cortex-m-rt",
- "cyw43",
- "cyw43-pio",
- "defmt 0.3.100",
- "defmt-rtt",
- "embassy-executor",
- "embassy-net",
- "embassy-rp",
- "embassy-sync 0.6.2",
- "embassy-time 0.4.0",
- "embedded-hal 1.0.0",
- "embedded-hal-async",
- "embedded-io",
- "embedded-io-async",
- "embedded-storage",
- "heapless",
- "panic-probe",
- "static_cell",
-]
-
-[[package]]
 name = "embedded-storage"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1308,6 +1283,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c92f344f63f950ee36cf4080050e4dce850839b9175da38f9d2ffb69b4dbb21"
 dependencies = [
  "crc-any",
+]
+
+[[package]]
+name = "rust-dps310-driver"
+version = "0.1.0"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
+ "cyw43",
+ "cyw43-pio",
+ "defmt 0.3.100",
+ "defmt-rtt",
+ "embassy-executor",
+ "embassy-net",
+ "embassy-rp",
+ "embassy-sync 0.6.2",
+ "embassy-time 0.4.0",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-io",
+ "embedded-io-async",
+ "embedded-storage",
+ "heapless",
+ "panic-probe",
+ "static_cell",
 ]
 
 [[package]]
